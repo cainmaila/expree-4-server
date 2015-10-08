@@ -1,0 +1,195 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+	<title>路跑操作器</title>
+	<link rel="stylesheet" href="reset.css">
+	<style>
+		html,body {
+			margin: 0px;
+			padding: 0px;
+			background-color: #A0A0A0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+		}
+	</style>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="js/jquery-2.1.0.min.js"></script>
+	<script type="text/javascript" src="js/pixi.js"></script>
+	<script type="text/javascript" src="cainJsLib/CainPixi.js"></script>
+</head>
+<body>
+	<script>
+	$((function() {
+		//==========================================================
+		var v = window.location.search.slice(1).split("&");
+		var i,a,roomId,ww,hh,button,npc,
+			audio = new Audio('goin.mp3'),
+			isGameStart = false,
+			isShaked = false,
+			uid = Math.floor(Math.random()*1000),
+			runTimeArr = {};
+		for(i in v){
+			a = v[i].split("=");
+			if(a[0]=="id"){
+				roomId = a[1];
+				break;
+			}
+		}
+		ww = $( window ).width();
+		hh = $( window ).height();
+		var stage = new PIXI.Stage(0xA0A0A0);
+		var renderer = PIXI.autoDetectRenderer(ww, hh);
+		document.body.appendChild(renderer.view);
+		spinningText = new PIXI.Text("連線中..", {font: "bold 48px Podkova", fill: "#ff3300", align: "center", stroke: "#FFFFFF", strokeThickness: 3});
+		spinningText.anchor.x = spinningText.anchor.y = 0.5
+		spinningText.position.x = ww >> 1;
+		spinningText.position.y = hh >> 1;
+		stage.addChild(spinningText);
+		requestAnimFrame(animate);
+		function animate() {
+			requestAnimFrame(animate);
+			renderer.render(stage);
+			for(id in runTimeArr){
+				runTimeArr[id].run();
+			}
+		}
+		var socket = io.connect("http://10.31.3.49");
+		socket.on("connection",function(data){
+			socket.emit("initRoom",{id:roomId});
+		});
+		socket.on("initRoom",function(data){
+			console.log(roomId);
+			var assetsLoader = ["srartBn.png"];
+			loader = new PIXI.AssetLoader(assetsLoader);
+			loader.onComplete = function () {
+				stage.removeChild(spinningText);
+				button = new PIXI.Sprite(PIXI.Texture.fromImage("srartBn.png"));
+				button.anchor.x = button.anchor.y = 0.5;
+				button.position = {x:ww>>1,y:hh>>1};
+				stage.addChild(button);
+				button.interactive = true;
+				button.click = button.tap = function () {
+					// 按下
+					audio.load();
+					stage.removeChild(button);
+					spinningText.setText("報名中..");
+					stage.addChild(spinningText);
+					socket.emit("data",{id:roomId,uid:uid,com:"login"});
+				}
+			}
+			loader.load();
+		});
+		socket.on("data",function(data){
+			//console.log(data);
+			if(data.com == "type"){
+				if(data.typeA == "gameSet"){
+					//if (window.DeviceMotionEvent) {  
+					if (false) {  
+						isShaked = true;
+         				spinningText.setText("準備擊點或搖晃");
+					}else{
+						isShaked = false;
+						spinningText.setText("準備擊點畫面");
+					}
+					stage.addChild(spinningText);
+				}else if(data.typeA == "gameStart"){
+					spinningText.setText("開始!");
+					isGameStart = true;
+					stage.click = stage.tap = function(data){
+						if(isGameStart){
+							npc.texture.textureV = 0;
+							socket.emit("data",{id:roomId,uid:uid,com:"go"});
+							tapNum++;
+							spinningText.setText(""+tapNum+" click!");
+						}
+					}
+					if(isShaked==true){
+						window.addEventListener('devicemotion',deviceMotionHandler, false);
+					}
+				}
+				return false;
+			}
+			if(data.uid != uid) return false;
+			if(data.com == "npcInit"){
+				audio.play();
+				linkReady(data.npcPath);
+			}else if(data.com == "npcRank"){
+				isGameStart = false;
+				npc.texture.textureV = 500;
+				spinningText.setText("第"+data.npcRank+"名");
+			}else if(data.com == "npcNumMax"){
+				spinningText.setText("參賽人數已滿");
+				stage.addChild(spinningText);
+				socket.removeAllListeners("data");
+			}else if(data.com == "gameIsStart"){
+				spinningText.setText("比賽已經開始了");
+				stage.addChild(spinningText);
+				socket.removeAllListeners("data");
+			}
+		});
+		var SHAKE_THRESHOLD = 500,tapNum = 0;;
+		var lastUpdate = 0;
+		var x, y, z, last_x, last_y, last_z;
+		function deviceMotionHandler(eventData) {  
+		  var acceleration =eventData.accelerationIncludingGravity;  
+		  var curTime = newDate().getTime();  
+		  if ((curTime - lastUpdate)> 100) {  
+		      var diffTime = curTime -last_update;  
+		      last_update = curTime;  
+		      x = acceleration.x;  
+		      y = acceleration.y;  
+		      z = acceleration.z;  
+		      var speed = Math.abs(x +y + z - last_x - last_y - last_z) / diffTime * 10000;  
+		      if (speed > SHAKE_THRESHOLD) {  
+		            if(isGameStart){
+							npc.texture.textureV = 0;
+							socket.emit("data",{id:roomId,uid:uid,com:"go"});
+							tapNum++;
+							spinningText.setText(""+tapNum+" click!");
+						} 
+		      }  
+		      last_x = x;  
+		      last_y = y;  
+		      last_z = z;  
+		    }
+		} 
+
+		//開始pixi
+		function linkReady (npcPath) {
+			var assetsLoader = [npcPath,"talk.png","combg.jpg"];
+			loader = new PIXI.AssetLoader(assetsLoader);
+			loader.onComplete = function() {
+				stage.removeChild(spinningText);
+				var bg = new PIXI.Sprite(PIXI.Texture.fromImage("combg.jpg"));
+				var sc = hh/bg.height;
+				bg.anchor.x = 0.5
+				button.anchor.y = 1;
+				bg.scale = {x:sc,y:sc};
+				bg.position = {x:ww>>1,y:0};
+				stage.addChild(bg);
+				npc = CainPixi.Npc(npcPath,"talk.png",25,3);
+				npc.position.x = ww>>1;
+		    	npc.position.y = hh;
+		    	npc.scale = {x:2,y:2};
+				stage.addChild(npc);
+				npc.autoMove(5,{x:npc.x,y:hh-150},function () {
+					npc.move(0,0);
+					npc.talk("參加比賽");
+				});
+				runTimeArr.npc = {
+					run:function() {
+						npc.nextFrame();
+					}
+				}
+			};
+			loader.load();
+		}
+		//==========================================================
+	})())
+	</script>
+</head>
+</body>
+</html

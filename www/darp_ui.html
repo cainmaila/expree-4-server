@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv='cache-control' content='no-cache'>
+	<title>影音轉檔服務 v1.02</title>
+	<meta property="og:image" content="http://www.cainplay.com/shareimg/cainplayvideo.jpg" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="dist/semantic.css">
+	<style>
+		body {
+			font-family:Microsoft JhengHei;
+			color : #0C2D9C;
+			margin : 20px;
+		}
+		#drag_file{
+			height : 300px;
+		}
+		.anfile2 {
+			width : 100%;
+			height : 20px;
+			border-style:solid;
+			border-width : 2px;
+			border-color : #000000;
+		}
+		.filename {
+			line-height : 20px;
+			padding-left : 10px;
+		}
+		.upstep {
+			width : 0%;
+			height : 20px;
+			background-color : #D632D6;
+		}
+		.dele {
+			padding-left : 10px;
+		}
+	</style>
+	<script src="js/jquery-1.8.3.min.js"></script>
+	<script src="dist/semantic.js"></script>
+	<script>
+		window.onload = function  () {
+			var drag_file = document.getElementById('drag_file'),
+				allstep = document.getElementById('allstep');
+			drag_file.addEventListener("dragover", on_dragover,false);
+			drag_file.addEventListener("drop", on_drop,false);
+			drag_file.addEventListener("click", function  () {
+				$("#file").click().change(function(event) {
+					event.preventDefault();
+					$("#drag_file").hide(0);
+					fileUpload(event.target.files)
+				});
+			},false);
+			/**
+			 * 拖曳中
+			 */
+			function on_dragover (e) {
+				e.preventDefault();
+				drag_file.innerHTML = "x="+e.x+" , y="+e.y;
+			}
+			/**
+			 * 拖曳
+			 */
+			function on_drop (e) {
+				e.preventDefault();
+				$("#drag_file").hide(0);
+				var files = e.dataTransfer.files;
+				fileUpload(files);
+			}
+			function fileUpload (files) {
+				var num = files.length;
+				$('#allstep').empty();
+				for (var i = 0; i < num; i++) {
+					 $('<div class="filePage ui secondary segment"><div class="filename">'+files[i].name+'</div><div class="ui indicating demo progress active anfile" data-percent="0"><div class="bar" style="-webkit-transition: 300ms; transition: 300ms; width: 0%;"></div></div></div>').appendTo("#allstep");
+				};
+				var fd,xhr;
+				i = 0;
+				upFile(i);
+				function upFile (key_) {
+					fd = new FormData();
+					fd.append('files',files[key_]);
+	            	xhr = new XMLHttpRequest();
+	            	xhr.addEventListener("load", uploadComplete, false);
+	            	xhr.upload.addEventListener("progress", uploadProgress, false);
+	            	xhr.open("POST", "/fileUpload_drap/0");
+	  				xhr.send(fd);
+				}
+            	function uploadComplete (e) {
+            		xhr.removeEventListener("load", uploadComplete);
+            		xhr.upload.removeEventListener("progress", uploadProgress);
+            		//console.log("unable to compute "+i);
+            		drag_file.innerHTML = "uploadComplete! "+i;
+            		$(".filename").eq(i).wrap("<a href= download/"+e.target.responseText+" target='_blank' >");
+            		$(".anfile").eq(i).after("<div class='dele'><a href= download/"+e.target.responseText+" target='_blank' >上傳完成，點連結請播放明細頁<a></div>");
+            		i+=1;
+            		//console.log("uploadComplete num="+num+" i="+i);
+            		if(i<num){
+            			upFile(i);
+            		}
+            	}
+            	function uploadProgress (evt) {
+            		if (evt.lengthComputable) {
+					    var percentComplete = Math.round(evt.loaded * 100 / evt.total);
+					    //$($(".upstep")[i]).css("width",percentComplete.toString() + '%');
+					    $(".anfile").eq(i).attr("data-percent", percentComplete);   //css("width",percentComplete.toString() + '%');
+					    $(".bar").eq(i).css("width",""+percentComplete+"%");
+					}
+					else {
+						console.log("unable to compute");
+					}
+            	}
+			}
+			//get list
+			var htmlStr = "",
+				n=0;
+			$.getJSON('/list', null, function(json, textStatus) {
+					/*optional stuff to do after success */
+				n = json.length;
+				for (var i = n-1; i >= 0; i--) {
+					htmlStr += '<div class="item"><a class="content" target="_blank" href="download/'+ json[i].keyfile +'">'+json[i].file +'</a></div>';
+				}
+				$("#list").append(htmlStr);
+				htmlStr = "";
+			});
+		}
+	</script>
+</head>
+<body>
+	<div id="drag_file" class="ui secondary segment">請把要上傳的檔案拉到這</div>
+	<div id="allstep"></div>
+	<input type="file" name="file" id="file" size="20" style="display:none;">
+	<h2 class="ui header">上傳紀錄</h2>
+	<div id="list" class="ui celled ordered list"></div>
+</body>
+</html>

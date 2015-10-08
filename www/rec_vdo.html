@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv='cache-control' content='no-cache'>
+	<title>錄影服務 v1.0</title>
+	<meta property="og:image" content="http://www.cainplay.com/shareimg/recvdo.jpg" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+	<link rel="stylesheet" type="text/css" href="/dist/semantic.css">
+	<script src="js/jquery-1.8.3.min.js"></script>
+	<script src="dist/semantic.js"></script>
+	<script src="js/RecordRTC.js"></script>
+	<style>
+		body {
+			color : #0C2D9C;
+			margin : 20px;
+		}
+		.playBn {
+			height : 50px;
+			width : 100%;
+			margin : 20px;
+		}
+	</style>
+	<script>
+		window.onload = function() {
+			navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+			var constraints = {
+					mandatory: {
+				        height: 480,
+				        width: 720
+				    },
+					audio: false, 
+					video: true
+				},
+				video = document.querySelectorAll("video")[0],
+				output = document.querySelector("#output"),
+				stream,
+				isGetWebCam = false,
+				isRecord = false;
+			navigator.getUserMedia(constraints, successCallback, errorCallback);
+			function successCallback (stream_) {
+				isGetWebCam = true;
+				playBn.innerHTML = "按下開始錄製";
+				output.innerHTML = "已取得攝影機";
+				stream = stream_;
+			}
+			function errorCallback (e) {
+				output.innerHTML = "攝影機被禁止，搞屁呀...";
+				console.log(e);
+			}
+			var playBn = document.querySelector("#palyBn");
+			playBn.addEventListener("click", function  (e) {
+				if (isGetWebCam) {
+					if (isRecord) {
+						playBn.innerHTML = "按下開始錄製";
+						output.innerHTML = "";
+						isRecord = false;
+						recordVideo.stopRecording(function  (_url) {
+							recordVideo.getDataURL(function(videoDataURL) {
+                                video.src = videoDataURL;
+                                video.loop = true;
+                                video.play();
+                                var blob = recordVideo.getBlob();
+								var xhr = new XMLHttpRequest();
+								xhr.open("POST", "/save_mov", true);
+								xhr.upload.addEventListener("progress", progress, false);
+								xhr.addEventListener("load", uploadComplete, false);
+								output.innerHTML = "影片影片上傳中";
+								playBn.display = "none";
+				  				xhr.send(blob);
+				  				function progress(e) {
+				  					var percentComplete = Math.round(e.loaded * 100 / e.total);
+				  					output.innerHTML = "影片影片上傳中 "+ percentComplete+"%";
+									//console.log(percentComplete);
+				  				}
+				  				function uploadComplete(e) {
+				  					//console.log(e.target.responseText);
+				  					output.innerHTML = "影片已上傳";
+				  					xhr.upload.removeEventListener("progress", progress);
+				  					xhr.removeEventListener("load", uploadComplete);
+				  					var htmlStr = '<div class="item"><a class="content" target="_blank" href="download/'+ e.target.responseText +'">'+e.target.responseText +'</a></div>';
+				  					$("#list").prepend(htmlStr);
+				  				}
+                            });
+						});
+					}else{
+						playBn.innerHTML = "現在錄影中，再按一次停止錄影";
+						output.innerHTML = "錄影中..";
+						window.stream = stream; // stream available to console
+						if (window.URL) {
+						   video.src = window.URL.createObjectURL(stream);
+						} else {
+						   video.src = stream;
+						}
+						video.play();
+						recordVideo = RecordRTC(stream, {
+			                                type: 'video',
+			                                video: { width: 720, height: 480 },
+			                                canvas: { width: 720, height: 480 }
+			                            });
+						recordVideo.startRecording();
+						isRecord = true;
+					}
+					
+				}else{
+					output.innerHTML = "請先同意取得攝影機";
+					navigator.getUserMedia(constraints, successCallback, errorCallback);
+					playBn.innerHTML = "上方(或下方)可以同意開啟攝影機";
+				}
+			})
+		};
+	</script>
+</head>
+<body>
+	<h1 class="ui header">
+  		錄影服務 v0.1
+  		<div class="sub header">按下錄製按鈕，直接利用你的WebCam錄製影片上傳轉檔</div>
+	</h1>
+	<div class="ui red button playBn" id="palyBn">請先同意取得攝影機</div>
+	<video width="720px" height="480px"></video>
+	<div class="ui floating message">
+  		<p id="output">請先同意取得攝影機</p>
+	</div>
+	<div id="list" class="ui celled ordered list"></div>
+</body>
+</html>

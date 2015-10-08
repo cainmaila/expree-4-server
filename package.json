@@ -1,0 +1,18 @@
+{
+  "name": "cain_server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "cainmaila@gmail.com",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.14.0",
+    "express": "^4.13.3",
+    "fs-extra": "^0.24.0",
+    "multer": "^1.0.3",
+    "socket.io": "^1.3.6"
+  }
+}

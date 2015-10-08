@@ -1,0 +1,251 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+	<meta property="og:title" content="4人用路跑遊戲DEMO"/>
+ 	<meta property="og:type" content="website"/>
+ 	<meta property="og:url" content="http://www.cainplay.com/racing/"/>
+ 	<meta property="og:image" content="http://www.cainplay.com/racing/img.jpg"/>
+	<title>4人用路跑遊戲DEMO</title>
+	<link rel="stylesheet" href="reset.css">
+	<style>
+		html,body {
+			margin: 0px;
+			padding: 0px;
+			background-color: #33CC33;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+		}
+		#qrcodeDiv{
+			width: 100%;
+			position: absolute;
+			text-align: center;
+		}
+	</style>
+	<script src="/socket.io/socket.io.js"></script>
+	<script type="text/javascript" src="js/minified/TweenMax.min.js"></script>
+	<script type="text/javascript" src="js/jquery-2.1.0.min.js"></script>
+	<script type="text/javascript" src="js/pixi.js"></script>
+	<script type="" src="cainJsLib/CainImage.js"></script>
+	<script type="text/javascript" src="cainJsLib/CainPixi.js"></script>
+</head>
+<body>
+	<div id="canvas"></div>
+	<div id="qrcodeDiv"><a id="qra" href="#" target="_blank"><img id="qrcode"></a></div>
+<script type="text/javascript">
+	if(!CainImage.IsHtml5){
+		alert("這個瀏覽器不支援Html5!!");
+	}
+	(function (){
+		var roomId,
+			npcRank= 0, //名次
+			npcNum = 0,
+			npcArr = [],
+			isGameStart = false,
+			ww = $(document).width(),
+			hh =  $(document).height(),
+			runTimeArr = {};
+		$("#qrcodeDiv").css("top",((hh-300)>>1)+"px");
+		var socket = io.connect("http://10.31.3.49");
+		socket.on("connection",function(data){
+			socket.emit("initRoom",data);
+		});
+		socket.on("initRoom",function(data){
+			roomId = data.id;
+			console.log(roomId);
+			createQRCode(roomId);
+		});
+		var _pa = "http://10.31.3.49/racing/com.html";
+		//var _pa = "http://10.34.2.103/nodsJs/racing/com.html";
+		function createQRCode(roomId_){
+			document.getElementById("qrcode").src="http://chart.apis.google.com/chart?cht=qr&chs=300x300&chl="+_pa+"?id="+roomId;
+			//document.getElementById("qra").href = _pa+"?id="+roomId;
+		}
+		// pixi...
+		var stage = new PIXI.Stage(0x33CC33);
+		var renderer = PIXI.autoDetectRenderer(ww, hh);
+		$("#canvas").html(renderer.view);
+		var assetsLoader = ["bg.min.jpg","srartBn.png","npc/"+(Math.floor(Math.random()*16)+1)+".png","npc/"+(Math.floor(Math.random()*16)+1)+".png","npc/"+(Math.floor(Math.random()*16)+1)+".png","npc/"+(Math.floor(Math.random()*16)+1)+".png"];
+		loader = new PIXI.AssetLoader(assetsLoader);
+		loader.onComplete = function() {
+			var bgm = new Audio("bgm.mp3");
+			bgm.load();
+			bgm.loop = true;
+			requestAnimFrame(animate);
+			//socket on data
+			socket.on("data",function(data){
+				console.log(data);
+				switch(data.com){
+					case "login":
+						if(isGameStart){
+							socket.emit("data",{id:roomId,uid:data.uid,com:"gameIsStart"});
+							break;
+						}
+						if(npcNum<4){
+							new Audio("inme.mp3").play();
+							npcInit(data.uid);
+							if (npcNum==4) {
+								$("#qrcodeDiv").hide(500);
+							}
+						}else{
+							socket.emit("data",{id:roomId,uid:data.uid,com:"npcNumMax"});
+						}
+					break;
+					case "go":
+						if(isGameStart==false) break;
+						for (var i = 0; i < npcNum; i++) {
+							if(npcArr[i].uid == data.uid){
+								npcArr[i].v +=1;
+								break;
+							}
+						};
+					break;
+					default:
+				}
+				//$("#qrcodeDiv").hide();
+			});
+			//bg
+			var isBgEnd = false,
+				bg = new PIXI.Sprite(PIXI.Texture.fromImage("bg.min.jpg")),
+				bgMax_x = -2000+ww,
+				endPoX = ww-100;
+			bg.position.y = hh-1000;
+			bg.v = 0;
+			stage.addChild(bg);
+			
+			function countdown (num,callBack) {
+				// 倒數計時
+				var spinningText;
+				countNum(num);
+				function countNum (num_,callBack2) {
+					// 顯示
+					spinningText = new PIXI.Text(""+num_, {font: "bold 360px Podkova", fill: "#ff3300", align: "center", stroke: "#FFFFFF", strokeThickness: 6});
+					spinningText.anchor.x = spinningText.anchor.y = 0.5
+					spinningText.position.x = ww >> 1;
+					spinningText.position.y = hh >> 1;
+					stage.addChild(spinningText);
+					TweenMax.fromTo(spinningText.scale,1,{x:3,y:3},{x:0,y:0,onComplete:function(argument) {
+						if(num_>1){
+							countNum(num_-1);
+						}else{
+							callBack();
+						}
+					}});
+					TweenMax.from(spinningText,0.5,{alpha:0});
+				}
+			}
+			//npc
+			function npcInit (uid) {
+				var npc = CainPixi.Npc(assetsLoader[2+npcNum],"talk.png",25,3);
+				socket.emit("data",{id:roomId,uid:uid,com:"npcInit",npcPath:assetsLoader[2+npcNum]});
+				npc.uid = uid;
+				npc.isEnd = false;
+				npc.texture.textureV = 500;
+				npc.position.x = 100;
+				npc.position.y = hh-200+50*npcNum;
+		    	npc.v = 0;
+		    	npc.move(3,0);
+				stage.addChild(npc);
+				runTimeArr[uid] = {
+					run:function() {
+						if(npc.isEnd == true){
+							npc.texture.textureV = 500;
+							npcRank++;
+							socket.emit("data",{id:roomId,uid:npc.uid,com:"npcRank",npcRank:npcRank});
+							if(npcRank==1){
+								new Audio("end.mp3").play();
+								npc.talk("Ya!我第 1 名!");
+							}else if(npcRank==2){
+								npc.talk("第 2 名! 就差一點..");
+							}else if(npcRank==3){
+								npc.talk("第 3 名....");
+							}else if(npcRank==4){
+								npc.talk("我最後....囧");
+							}
+							//全都終點
+							if(npcRank == npcNum){
+								TweenMax.to(bgm,3,{volume:0.1});
+							}
+							delete runTimeArr[npc.uid];
+							return false;
+						}
+						npc.nextFrame();
+						if(isBgEnd == false){
+							npc.move(3,npc.v);
+						}else{
+							npc.move(3,npc.v-bg.v);
+						}
+						//到終點
+						if(npc.position.x >= endPoX){
+							npc.isEnd = true;
+							npc.v = 0;
+						}
+						npc.v *=0.8
+						if(npc.v == 0){
+							npc.texture.textureV = 500;
+						}else if(npc.v>0.5){
+							npc.texture.textureV = 1;
+						}else{
+							npc.texture.textureV = 3;
+						}
+					}
+				}
+				npcArr.push(npc);
+				npcNum++;
+			}
+			//startBn
+			var startBn = new PIXI.Sprite(PIXI.Texture.fromImage("srartBn.png"));
+			startBn.setInteractive(true);
+			startBn.position = {x:50,y:50};
+			stage.addChild(startBn);
+			startBn.click = startBn.tap = function (data) {
+				if(npcNum<2){
+					alert("至少兩人參加比賽!");
+					return false;
+				} 
+				startBn.setInteractive(false);
+				startBn.visible = false;
+				
+				$("#qrcodeDiv").hide(500);
+				socket.emit("data",{id:roomId,com:"type",typeA:"gameSet"});
+				new Audio("areYouReady.mp3").play();
+				countdown(3,function function_name (argument) {
+					// 倒數計時...
+					gameStart();
+				});
+			}
+			function gameStart (){
+				bgm.play();
+				socket.emit("data",{id:roomId,com:"type",typeA:"gameStart"});
+				isGameStart = true;
+				var npc;
+				for (var i = 0; i < npcNum; i++) {
+					npc = npcArr[i];
+					npc.texture.textureV = 3;
+					npc.texture.playRun = 0;
+					npc.v = 0.5;
+				};
+				bg.v = -2;
+			}
+
+			function animate() {
+				requestAnimFrame(animate);
+				renderer.render(stage);
+				//執行緒
+				if(bg.position.x>bgMax_x){
+					bg.position.x += bg.v;
+				}else{
+					isBgEnd = true; 
+				}
+				for(id in runTimeArr){
+					runTimeArr[id].run();
+				}
+			}
+		};
+		loader.load();
+	})()
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+      html, body, #map-canvas {
+        height: 100%;
+        margin: 0px;
+        padding: 0px
+      }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp"></script>
+    <script>
+var map;
+var directionsService = new google.maps.DirectionsService();
+var map;
+var start = "台中市西區五權路50號";
+var end = "台中市體育場";
+var waypoints = "台北";
+function initialize() {
+  var rendererOptions = {
+                suppressMarkers: true
+        };
+  directionsDisplay = new google.maps.DirectionsRenderer(rendererOptions);
+  var startPoint = new google.maps.LatLng(24.136845, 120.685009);
+
+  var mapOptions = {
+    zoom: 14,
+    center: startPoint
+  };
+  map = new google.maps.Map(document.getElementById('map-canvas'),
+      mapOptions);
+  calcRoute();
+}
+//規畫路徑
+function calcRoute() {
+        if (!waypoints) return;
+ 
+        var arrPoint = waypoints.split(",");
+ 
+        //經過地點
+        var waypts = [];
+        for (var i = 0; i < arrPoint.length; i++) {
+                waypts.push({
+                        location: arrPoint[i],
+                        stopover: true
+                });
+        }
+ 
+        //規畫路徑請求
+        var request = {
+                origin: start,
+                destination: end,
+                waypoints: waypts,
+                optimizeWaypoints: true,
+                travelMode: google.maps.DirectionsTravelMode.DRIVING
+        };
+         
+        directionsService.route(request, function(response, status) {
+                //規畫路徑回傳結果
+                if (status == google.maps.DirectionsStatus.OK) {
+                        directionsDisplay.setDirections(response);
+                        directionsDisplay.setMap(map);
+                }
+        });
+}
+google.maps.event.addDomListener(window, 'load', initialize);
+
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+  </body>
+</html>
